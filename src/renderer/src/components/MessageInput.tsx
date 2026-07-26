@@ -7,7 +7,6 @@ export function MessageInput() {
   const sendMessage = useStore((s) => s.sendMessage)
   const stopStreaming = useStore((s) => s.stopStreaming)
   const models = useStore((s) => s.models)
-  const setSettingsOpen = useStore((s) => s.setSettingsOpen)
 
   const [text, setText] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -23,10 +22,6 @@ export function MessageInput() {
   function handleSend(): void {
     const t = text.trim()
     if (!t || isStreaming) return
-    if (models.length === 0) {
-      setSettingsOpen(true, 'models')
-      return
-    }
     setText('')
     void sendMessage(t)
   }

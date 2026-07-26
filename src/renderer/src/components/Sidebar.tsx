@@ -22,6 +22,8 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
   const removeConversation = useStore((s) => s.removeConversation)
   const renameConversation = useStore((s) => s.renameConversation)
 
+  const visibleConversations = conversations.filter((c) => c.visible)
+
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editText, setEditText] = useState('')
 
@@ -52,14 +54,14 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
       </div>
 
       <div className="conversation-list">
-        {conversations.length === 0 && (
+        {visibleConversations.length === 0 && (
           <div className="empty-tip">
             <ChatIcon width={36} height={36} />
             <p>还没有对话</p>
             <span>点击「新对话」开始</span>
           </div>
         )}
-        {conversations.map((c) => {
+        {visibleConversations.map((c) => {
           const active = c.id === currentId
           const editing = editingId === c.id
           return (

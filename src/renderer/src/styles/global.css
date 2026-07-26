@@ -824,119 +824,41 @@ select {
   color: var(--text-primary);
 }
 
-/* ===== Welcome / Empty ===== */
-.welcome {
+/* ===== Chat Empty ===== */
+.chat-empty {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   height: 100%;
-  gap: 8px;
+  gap: 16px;
   padding: 24px;
   text-align: center;
+  color: var(--text-secondary);
 }
 
-.welcome-logo {
-  width: 64px;
-  height: 64px;
+.chat-empty-logo {
+  width: 56px;
+  height: 56px;
   border-radius: var(--radius-xl);
   background: linear-gradient(135deg, var(--accent), #8b5cf6);
   color: white;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 36px;
+  font-size: 30px;
   font-weight: 700;
-  margin-bottom: 12px;
   box-shadow: var(--shadow-md);
+  opacity: 0.85;
 }
 
-.welcome h1 {
-  font-size: 28px;
-  font-weight: 700;
-  background: linear-gradient(135deg, var(--accent), #8b5cf6);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.welcome > p {
-  color: var(--text-secondary);
-  font-size: 15px;
-}
-
-.welcome-hint {
-  margin-top: 24px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-}
-
-.welcome-hint p {
-  color: var(--text-secondary);
-}
-
-.welcome-suggestions {
-  margin-top: 28px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-}
-
-.suggestion-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: center;
-  max-width: 480px;
-}
-
-.suggestion-chip {
-  padding: 8px 14px;
-  border-radius: var(--radius-lg);
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  color: var(--text-secondary);
-  font-size: 13px;
-  transition: all 0.12s;
-}
-
-.suggestion-chip:hover:not(:disabled) {
-  background: var(--accent-soft);
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.suggestion-chip:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.chat-empty p {
+  font-size: 14px;
 }
 
 .muted {
   color: var(--text-muted) !important;
   font-size: 13px !important;
-}
-
-.no-conversation {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  color: var(--text-secondary);
-}
-
-.no-conversation svg {
-  color: var(--text-muted);
-}
-
-.no-conversation h2 {
-  font-size: 20px;
-  color: var(--text-primary);
-  margin-top: 8px;
 }
 
 /* ===== Message Input ===== */
@@ -1091,6 +1013,18 @@ select {
   gap: 8px;
   padding: 16px 24px;
   border-top: 1px solid var(--border-color);
+}
+
+/* ===== Confirm Dialog ===== */
+.confirm-dialog {
+  max-width: 400px;
+}
+
+.confirm-message {
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.7;
+  margin: 0;
 }
 
 /* ===== Form ===== */

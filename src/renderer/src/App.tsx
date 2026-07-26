@@ -5,7 +5,7 @@ import { ChatHeader } from './components/ChatHeader'
 import { MessageBubble } from './components/MessageBubble'
 import { MessageInput } from './components/MessageInput'
 import { SettingsModal } from './components/SettingsModal'
-import { ChatIcon, PlusIcon } from './components/Icons'
+import { ConfirmDialog } from './components/ConfirmDialog'
 
 export default function App() {
   const initialized = useStore((s) => s.initialized)
@@ -14,9 +14,6 @@ export default function App() {
   const currentId = useStore((s) => s.currentConversationId)
   const settingsOpen = useStore((s) => s.settingsOpen)
   const setSettingsOpen = useStore((s) => s.setSettingsOpen)
-  const createConversation = useStore((s) => s.createConversation)
-  const models = useStore((s) => s.models)
-  const isStreaming = useStore((s) => s.isStreaming)
   const theme = useStore((s) => s.settings.theme)
 
   const [isDark, setIsDark] = useState(false)
@@ -57,78 +54,33 @@ export default function App() {
   }
 
   const currentConv = conversations.find((c) => c.id === currentId)
+  const hasMessages = !!currentConv && currentConv.messages.length > 0
 
   return (
     <div className={`app ${isDark ? 'dark' : 'light'}`}>
       <Sidebar onOpenSettings={() => setSettingsOpen(true)} />
 
       <main className="chat-area">
-        {currentConv ? (
-          <>
-            <ChatHeader />
-            <div className="messages-container">
-              {currentConv.messages.length === 0 ? (
-                <div className="welcome">
-                  <div className="welcome-logo">＋</div>
-                  <h1>Chatbox++</h1>
-                  <p>简洁美观的 AI 对话助手</p>
-                  {models.length === 0 ? (
-                    <div className="welcome-hint">
-                      <p>👋 欢迎使用！请先配置你的第一个 AI 模型。</p>
-                      <button
-                        className="btn btn-primary"
-                        onClick={() => setSettingsOpen(true, 'models')}
-                      >
-                        <PlusIcon width={16} height={16} />
-                        配置模型
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="welcome-suggestions">
-                      <p className="muted">试试问我：</p>
-                      <div className="suggestion-chips">
-                        {[
-                          '用一句话介绍你自己',
-                          '帮我写一首关于秋天的诗',
-                          '解释一下量子纠缠'
-                        ].map((s) => (
-                          <button
-                            key={s}
-                            className="suggestion-chip"
-                            onClick={() => useStore.getState().sendMessage(s)}
-                            disabled={isStreaming}
-                          >
-                            {s}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="messages-list">
-                  {currentConv.messages.map((m) => (
-                    <MessageBubble key={m.id} message={m} />
-                  ))}
-                </div>
-              )}
+        <ChatHeader />
+        <div className="messages-container">
+          {hasMessages ? (
+            <div className="messages-list">
+              {currentConv!.messages.map((m) => (
+                <MessageBubble key={m.id} message={m} />
+              ))}
             </div>
-            <MessageInput />
-          </>
-        ) : (
-          <div className="no-conversation">
-            <ChatIcon width={48} height={48} />
-            <h2>开始你的第一次对话</h2>
-            <p>创建一个新对话，选择模型后即可开始聊天</p>
-            <button className="btn btn-primary" onClick={() => createConversation()}>
-              <PlusIcon width={16} height={16} />
-              新建对话
-            </button>
-          </div>
-        )}
+          ) : (
+            <div className="chat-empty">
+              <div className="chat-empty-logo">＋</div>
+              <p>输入消息，开始新的对话</p>
+            </div>
+          )}
+        </div>
+        <MessageInput />
       </main>
 
       {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
+      <ConfirmDialog />
     </div>
   )
 }

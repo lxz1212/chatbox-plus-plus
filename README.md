@@ -132,4 +132,6 @@ Chatbox++/
 
 ## 📄 许可证
 
-MIT
+本项目基于 [MIT 许可证](LICENSE) 开源。
+
+Copyright (c) 2026 lxz1212

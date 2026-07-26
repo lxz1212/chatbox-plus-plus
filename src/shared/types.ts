@@ -98,6 +98,8 @@ export interface Conversation {
   thinkingLevel: ThinkingLevel | null
   /** 消息列表 */
   messages: ChatMessage[]
+  /** 是否在侧边栏显示；新建的空对话为 false，发送首条消息后才显示并持久化 */
+  visible: boolean
   createdAt: number
   updatedAt: number
 }

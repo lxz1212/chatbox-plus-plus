@@ -84,13 +84,17 @@ function normalizeModel(m: ModelConfig): ModelConfig {
   }
 }
 
-/** 兼容旧版本数据：把旧 thinkingEnabled 迁移为 thinkingMode */
+/** 兼容旧版本数据：把旧 thinkingEnabled 迁移为 thinkingMode，补全 visible */
 function normalizeConversation(c: Conversation): Conversation {
-  if (typeof (c as unknown as { thinkingMode?: unknown }).thinkingMode === 'string') {
-    return c
+  let result = c
+  if (typeof (result as unknown as { thinkingMode?: unknown }).thinkingMode !== 'string') {
+    const enabled = (result as unknown as { thinkingEnabled?: boolean }).thinkingEnabled
+    result = { ...result, thinkingMode: enabled ? 'enabled' : 'disabled' }
   }
-  const enabled = (c as unknown as { thinkingEnabled?: boolean }).thinkingEnabled
-  return { ...c, thinkingMode: enabled ? 'enabled' : 'disabled' }
+  if (typeof (result as unknown as { visible?: unknown }).visible !== 'boolean') {
+    result = { ...result, visible: true }
+  }
+  return result
 }
 
 /** 由首条用户消息生成对话标题 */
@@ -154,6 +158,23 @@ interface ChatboxState {
   updateSettings: (partial: Partial<AppSettings>) => Promise<void>
   setSettingsOpen: (open: boolean, tab?: 'models' | 'general') => void
   setTheme: (theme: ThemeMode) => Promise<void>
+
+  // 通用确认对话框
+  dialog: {
+    title: string
+    message: string
+    confirmText: string
+    cancelText: string
+    onConfirm: (() => void) | null
+  } | null
+  openDialog: (opts: {
+    title: string
+    message: string
+    confirmText?: string
+    cancelText?: string
+    onConfirm?: () => void
+  }) => void
+  closeDialog: () => void
 }
 
 export const useStore = create<ChatboxState>((set, get) => {
@@ -246,10 +267,10 @@ export const useStore = create<ChatboxState>((set, get) => {
     }
   })
 
-  /** 保存指定对话（内部用） */
+  /** 保存指定对话（内部用）；隐藏的草稿对话不持久化 */
   async function persistConversation(convId: string): Promise<void> {
     const conv = get().conversations.find((c) => c.id === convId)
-    if (conv) await api.saveConversation(conv)
+    if (conv && conv.visible) await api.saveConversation(conv)
   }
 
   return {
@@ -260,6 +281,7 @@ export const useStore = create<ChatboxState>((set, get) => {
     currentConversationId: null,
     settingsOpen: false,
     settingsTab: 'general',
+    dialog: null,
 
     isStreaming: false,
     currentRequestId: null,
@@ -292,12 +314,30 @@ export const useStore = create<ChatboxState>((set, get) => {
         })
       // 按更新时间倒序
       conversations.sort((a, b) => b.updatedAt - a.updatedAt)
+      // 打开软件时自动创建一个隐藏的草稿对话并进入
+      const draftModelId = settings.defaultModelId ?? models[0]?.id ?? ''
+      const draftModel = models.find((m) => m.id === draftModelId)
+      const draftThinking = draftModel
+        ? thinkingStateForModel(draftModel)
+        : { thinkingMode: 'default' as ThinkingMode, thinkingLevel: null }
+      const draftNow = Date.now()
+      const draft: Conversation = {
+        id: uid(),
+        title: '新对话',
+        modelId: draftModelId,
+        thinkingMode: draftThinking.thinkingMode,
+        thinkingLevel: draftThinking.thinkingLevel,
+        messages: [],
+        visible: false,
+        createdAt: draftNow,
+        updatedAt: draftNow
+      }
       set({
         models,
-        conversations,
+        conversations: [draft, ...conversations],
         settings,
         initialized: true,
-        currentConversationId: conversations[0]?.id ?? null
+        currentConversationId: draft.id
       })
     },
 
@@ -343,6 +383,16 @@ export const useStore = create<ChatboxState>((set, get) => {
 
     createConversation(modelId) {
       const state = get()
+      // 若当前对话是尚未发送的隐藏草稿对话，先从内存移除（它从未持久化，无需删除）
+      const currentConv = state.conversations.find(
+        (c) => c.id === state.currentConversationId
+      )
+      const dropCurrent =
+        !!currentConv && !currentConv.visible && currentConv.messages.length === 0
+      const remaining = dropCurrent
+        ? state.conversations.filter((c) => c.id !== currentConv!.id)
+        : state.conversations
+
       const targetModelId =
         modelId ?? state.settings.defaultModelId ?? state.models[0]?.id ?? ''
       const now = Date.now()
@@ -357,31 +407,52 @@ export const useStore = create<ChatboxState>((set, get) => {
         thinkingMode: thinking.thinkingMode,
         thinkingLevel: thinking.thinkingLevel,
         messages: [],
+        visible: false,
         createdAt: now,
         updatedAt: now
       }
-      set((s) => ({
-        conversations: [conversation, ...s.conversations],
+      set(() => ({
+        conversations: [conversation, ...remaining],
         currentConversationId: conversation.id
       }))
-      void api.saveConversation(conversation)
+      // 隐藏的草稿对话不持久化；发送首条消息时才保存
       return conversation.id
     },
 
     selectConversation(id) {
-      set({ currentConversationId: id })
+      set((state) => {
+        // 若当前是隐藏草稿对话且切换到别的对话，先移除草稿（避免内存孤儿）
+        const current = state.conversations.find(
+          (c) => c.id === state.currentConversationId
+        )
+        const dropCurrent =
+          !!current &&
+          !current.visible &&
+          current.messages.length === 0 &&
+          current.id !== id
+        const conversations = dropCurrent
+          ? state.conversations.filter((c) => c.id !== current!.id)
+          : state.conversations
+        return { conversations, currentConversationId: id }
+      })
     },
 
     async removeConversation(id) {
       await api.deleteConversation(id)
       set((state) => {
         const conversations = state.conversations.filter((c) => c.id !== id)
-        const currentConversationId =
-          state.currentConversationId === id
-            ? conversations[0]?.id ?? null
-            : state.currentConversationId
+        let currentConversationId = state.currentConversationId
+        if (currentConversationId === id) {
+          // 优先选第一个可见对话作为当前
+          const firstVisible = conversations.find((c) => c.visible)
+          currentConversationId = firstVisible?.id ?? null
+        }
         return { conversations, currentConversationId }
       })
+      // 删除后若无当前对话，创建一个草稿对话
+      if (!get().currentConversationId) {
+        get().createConversation()
+      }
     },
 
     renameConversation(id, title) {
@@ -473,8 +544,16 @@ export const useStore = create<ChatboxState>((set, get) => {
 
       const model = state.models.find((m) => m.id === conv.modelId)
       if (!model) {
-        // 没有配置模型，打开设置
-        get().setSettingsOpen(true, 'models')
+        // 没有配置模型，弹出提示对话框
+        get().openDialog({
+          title: '尚未配置模型',
+          message: '请先在设置中配置一个 AI 模型，才能开始对话。',
+          confirmText: '去配置',
+          cancelText: '取消',
+          onConfirm: () => {
+            get().setSettingsOpen(true, 'models')
+          }
+        })
         return
       }
 
@@ -499,11 +578,17 @@ export const useStore = create<ChatboxState>((set, get) => {
             ? {
                 ...c,
                 title: newTitle,
-                messages: [...c.messages, userMsg, assistantMsg]
+                messages: [...c.messages, userMsg, assistantMsg],
+                visible: isFirst ? true : c.visible
               }
             : c
         )
       }))
+      // 首条消息：对话从隐藏草稿变为可见，立即持久化以在侧边栏显示
+      if (isFirst) {
+        const toShow = get().conversations.find((c) => c.id === convId)
+        if (toShow) void api.saveConversation(toShow)
+      }
 
       // 构建发送给 API 的消息列表
       const sysPrompt = state.settings.systemPrompt.trim()
@@ -585,6 +670,22 @@ export const useStore = create<ChatboxState>((set, get) => {
 
     async setTheme(theme) {
       await get().updateSettings({ theme })
+    },
+
+    openDialog(opts) {
+      set({
+        dialog: {
+          title: opts.title,
+          message: opts.message,
+          confirmText: opts.confirmText ?? '确定',
+          cancelText: opts.cancelText ?? '取消',
+          onConfirm: opts.onConfirm ?? null
+        }
+      })
+    },
+
+    closeDialog() {
+      set({ dialog: null })
     }
   }
 })
