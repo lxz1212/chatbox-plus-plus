@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import {
   ALL_THINKING_LEVELS,
+  ALL_THINKING_MODES,
   type ModelConfig,
   type ThinkingLevel,
-  type ThinkingType
+  type ThinkingMode
 } from '@shared/types'
 
 interface ModelFormProps {
@@ -12,26 +13,19 @@ interface ModelFormProps {
   onCancel: () => void
 }
 
-const THINKING_TYPE_OPTIONS: {
-  value: ThinkingType
-  label: string
-  desc: string
-}[] = [
-  { value: 'thinking', label: '仅思考', desc: '对话时始终启用思考' },
-  { value: 'non-thinking', label: '仅非思考', desc: '对话时不启用思考' },
-  {
-    value: 'selectable',
-    label: '可在对话时选择',
-    desc: '在对话界面提供思考开关'
-  }
-]
+const THINKING_MODE_LABEL: Record<ThinkingMode, string> = {
+  default: '默认',
+  enabled: '开启',
+  disabled: '关闭'
+}
 
 const LEVEL_LABEL: Record<ThinkingLevel, string> = {
+  default: '默认',
   low: '低',
   medium: '中',
   high: '高',
   xhigh: '超高',
-  max: '最大'
+  max: '极致'
 }
 
 const DEFAULT_FORM = {
@@ -45,8 +39,8 @@ const DEFAULT_FORM = {
   presencePenalty: '',
   frequencyPenalty: '',
   maxTokens: '',
-  thinkingType: 'non-thinking' as ThinkingType,
-  thinkingLevels: [] as ThinkingLevel[]
+  thinkingModes: ['default'] as ThinkingMode[],
+  thinkingLevels: ['default'] as ThinkingLevel[]
 }
 
 export function ModelForm({ initial, onSave, onCancel }: ModelFormProps) {
@@ -73,7 +67,9 @@ export function ModelForm({ initial, onSave, onCancel }: ModelFormProps) {
             ? ''
             : String(initial.frequencyPenalty),
         maxTokens: initial.maxTokens == null ? '' : String(initial.maxTokens),
-        thinkingType: initial.thinkingType,
+        thinkingModes: Array.isArray(initial.thinkingModes)
+          ? [...initial.thinkingModes]
+          : ['default'],
         thinkingLevels: [...initial.thinkingLevels]
       })
     } else {
@@ -95,14 +91,26 @@ export function ModelForm({ initial, onSave, onCancel }: ModelFormProps) {
     }))
   }
 
+  function toggleMode(mode: ThinkingMode): void {
+    setForm((f) => ({
+      ...f,
+      thinkingModes: f.thinkingModes.includes(mode)
+        ? f.thinkingModes.filter((m) => m !== mode)
+        : [...f.thinkingModes, mode]
+    }))
+  }
+
   function handleSubmit(): void {
     if (!form.name.trim()) return setError('请填写模型显示名称')
     if (!form.apiBase.trim()) return setError('请填写 API 基础地址')
     if (!form.apiKey.trim()) return setError('请填写 API Key')
     if (!form.modelId.trim()) return setError('请填写模型 ID')
 
-    if (form.thinkingType !== 'non-thinking' && form.thinkingLevels.length === 0) {
-      return setError('选择了思考模式后，至少需要勾选一个思考强度等级')
+    if (form.thinkingModes.length === 0) {
+      return setError('至少需要勾选一个思考模式')
+    }
+    if (form.thinkingLevels.length === 0) {
+      return setError('至少需要勾选一个思考强度等级')
     }
 
     const num = (v: string): number | null => {
@@ -122,13 +130,10 @@ export function ModelForm({ initial, onSave, onCancel }: ModelFormProps) {
       presencePenalty: num(form.presencePenalty),
       frequencyPenalty: num(form.frequencyPenalty),
       maxTokens: num(form.maxTokens),
-      thinkingType: form.thinkingType,
-      thinkingLevels:
-        form.thinkingType === 'non-thinking' ? [] : [...form.thinkingLevels]
+      thinkingModes: [...form.thinkingModes],
+      thinkingLevels: [...form.thinkingLevels]
     })
   }
-
-  const showLevels = form.thinkingType !== 'non-thinking'
 
   return (
     <div className="modal-backdrop">
@@ -266,48 +271,46 @@ export function ModelForm({ initial, onSave, onCancel }: ModelFormProps) {
 
           <div className="form-section">
             <h3 className="form-section-title">思考模式</h3>
-            <div className="thinking-type-options">
-              {THINKING_TYPE_OPTIONS.map((opt) => (
-                <label
-                  key={opt.value}
-                  className={`radio-card ${form.thinkingType === opt.value ? 'checked' : ''}`}
-                >
-                  <input
-                    type="radio"
-                    name="thinkingType"
-                    checked={form.thinkingType === opt.value}
-                    onChange={() => set('thinkingType', opt.value)}
-                  />
-                  <div className="radio-card-body">
-                    <span className="radio-card-title">{opt.label}</span>
-                    <span className="radio-card-desc">{opt.desc}</span>
-                  </div>
-                </label>
-              ))}
+            <p className="levels-hint">
+              勾选该模型支持的思考模式（在对话时可从中选择）：
+            </p>
+            <div className="level-chips">
+              {ALL_THINKING_MODES.map((mode) => {
+                const on = form.thinkingModes.includes(mode)
+                return (
+                  <button
+                    key={mode}
+                    type="button"
+                    className={`chip ${on ? 'on' : ''}`}
+                    onClick={() => toggleMode(mode)}
+                  >
+                    {THINKING_MODE_LABEL[mode]}
+                  </button>
+                )
+              })}
             </div>
+          </div>
 
-            {showLevels && (
-              <div className="thinking-levels">
-                <p className="levels-hint">
-                  勾选该模型支持的所有思考强度等级（用户在对话时只能从中选择）：
-                </p>
-                <div className="level-chips">
-                  {ALL_THINKING_LEVELS.map((lv) => {
-                    const on = form.thinkingLevels.includes(lv)
-                    return (
-                      <button
-                        key={lv}
-                        type="button"
-                        className={`chip ${on ? 'on' : ''}`}
-                        onClick={() => toggleLevel(lv)}
-                      >
-                        {LEVEL_LABEL[lv]}（{lv}）
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
+          <div className="form-section">
+            <h3 className="form-section-title">思考强度</h3>
+            <p className="levels-hint">
+              勾选该模型支持的所有思考强度等级（在对话时只能从中选择）：
+            </p>
+            <div className="level-chips">
+              {ALL_THINKING_LEVELS.map((lv) => {
+                const on = form.thinkingLevels.includes(lv)
+                return (
+                  <button
+                    key={lv}
+                    type="button"
+                    className={`chip ${on ? 'on' : ''}`}
+                    onClick={() => toggleLevel(lv)}
+                  >
+                    {LEVEL_LABEL[lv]}
+                  </button>
+                )
+              })}
+            </div>
           </div>
         </div>
 

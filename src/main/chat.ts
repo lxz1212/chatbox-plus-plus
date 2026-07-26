@@ -30,8 +30,13 @@ function buildRequestBody(params: ChatRequestParams): Record<string, unknown> {
     body.frequency_penalty = params.frequencyPenalty
   if (params.maxTokens != null) body.max_tokens = params.maxTokens
 
-  // 思考参数：使用 OpenAI 兼容的 reasoning_effort
-  if (params.thinkingEnabled && params.thinkingLevel) {
+  // 思考模式：thinking.type（'default' 时不传入该字段，由服务端决定）
+  if (params.thinkingMode && params.thinkingMode !== 'default') {
+    body.thinking = { type: params.thinkingMode }
+  }
+
+  // 思考强度：reasoning_effort（'default' 或 null 时不传入）
+  if (params.thinkingLevel && params.thinkingLevel !== 'default') {
     body.reasoning_effort = params.thinkingLevel
   }
 

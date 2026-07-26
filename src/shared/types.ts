@@ -3,11 +3,18 @@
  * 在主进程、预加载脚本与渲染进程中共用
  */
 
-/** 思考强度等级 */
-export type ThinkingLevel = 'low' | 'medium' | 'high' | 'xhigh' | 'max'
+/** 思考强度等级（'default' 表示不传入 reasoning_effort） */
+export type ThinkingLevel =
+  | 'default'
+  | 'low'
+  | 'medium'
+  | 'high'
+  | 'xhigh'
+  | 'max'
 
-/** 全部可选的思考强度等级（按强度递增排序） */
+/** 全部可选的思考强度等级 */
 export const ALL_THINKING_LEVELS: ThinkingLevel[] = [
+  'default',
   'low',
   'medium',
   'high',
@@ -15,8 +22,15 @@ export const ALL_THINKING_LEVELS: ThinkingLevel[] = [
   'max'
 ]
 
-/** 思考类型：仅思考 / 仅非思考 / 可在对话时选择是否思考 */
-export type ThinkingType = 'thinking' | 'non-thinking' | 'selectable'
+/** 思考模式（直接对应 thinking.type 参数；'default' 表示不传入该字段） */
+export type ThinkingMode = 'default' | 'enabled' | 'disabled'
+
+/** 全部可选的思考模式 */
+export const ALL_THINKING_MODES: ThinkingMode[] = [
+  'default',
+  'enabled',
+  'disabled'
+]
 
 /** 模型配置 */
 export interface ModelConfig {
@@ -42,9 +56,9 @@ export interface ModelConfig {
   frequencyPenalty: number | null
   /** max_tokens */
   maxTokens: number | null
-  /** 思考类型 */
-  thinkingType: ThinkingType
-  /** 该模型支持的思考强度等级（仅在 thinking/selectable 时有意义） */
+  /** 该模型支持的思考模式集合（多选） */
+  thinkingModes: ThinkingMode[]
+  /** 该模型支持的思考强度等级集合（多选） */
   thinkingLevels: ThinkingLevel[]
   /** 创建时间 */
   createdAt: number
@@ -78,8 +92,8 @@ export interface Conversation {
   title: string
   /** 绑定的模型配置 ID */
   modelId: string
-  /** 当前是否开启思考（仅当模型 thinkingType 为 selectable 时有意义） */
-  thinkingEnabled: boolean
+  /** 当前选择的思考模式 */
+  thinkingMode: ThinkingMode
   /** 当前选择的思考强度等级 */
   thinkingLevel: ThinkingLevel | null
   /** 消息列表 */
@@ -113,9 +127,9 @@ export interface ChatRequestParams {
   presencePenalty: number | null
   frequencyPenalty: number | null
   maxTokens: number | null
-  /** 是否启用思考 */
-  thinkingEnabled: boolean
-  /** 思考强度等级 */
+  /** 思考模式（'default' 表示不传入 thinking.type） */
+  thinkingMode: ThinkingMode
+  /** 思考强度等级（'default' 或 null 表示不传入 reasoning_effort） */
   thinkingLevel: ThinkingLevel | null
 }
 

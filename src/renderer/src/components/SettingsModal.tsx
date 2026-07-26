@@ -5,21 +5,23 @@ import { CloseIcon, PlusIcon, EditIcon, TrashIcon } from './Icons'
 import type {
   ModelConfig,
   ThinkingLevel,
+  ThinkingMode,
   ThemeMode
 } from '@shared/types'
 
 const LEVEL_LABEL: Record<ThinkingLevel, string> = {
+  default: '默认',
   low: '低',
   medium: '中',
   high: '高',
   xhigh: '超高',
-  max: '最大'
+  max: '极致'
 }
 
-const THINKING_TYPE_LABEL: Record<string, string> = {
-  thinking: '仅思考',
-  'non-thinking': '仅非思考',
-  selectable: '可在对话时选择'
+const THINKING_MODE_LABEL: Record<ThinkingMode, string> = {
+  default: '默认',
+  enabled: '开启',
+  disabled: '关闭'
 }
 
 interface SettingsModalProps {
@@ -124,17 +126,19 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
                           <div className="model-card-meta">
                             <span className="tag">{m.apiBase}</span>
                             <span className="tag thinking-tag">
-                              {THINKING_TYPE_LABEL[m.thinkingType]}
+                              思考：
+                              {m.thinkingModes
+                                .map((mode) => THINKING_MODE_LABEL[mode])
+                                .join(' / ')}
                             </span>
-                            {m.thinkingType !== 'non-thinking' &&
-                              m.thinkingLevels.length > 0 && (
-                                <span className="tag levels-tag">
-                                  强度：
-                                  {m.thinkingLevels
-                                    .map((lv) => LEVEL_LABEL[lv])
-                                    .join(' / ')}
-                                </span>
-                              )}
+                            {m.thinkingLevels.length > 0 && (
+                              <span className="tag levels-tag">
+                                强度：
+                                {m.thinkingLevels
+                                  .map((lv) => LEVEL_LABEL[lv])
+                                  .join(' / ')}
+                              </span>
+                            )}
                           </div>
                         </div>
                         <div className="model-card-actions">

@@ -5,6 +5,7 @@ import type {
   Conversation,
   ModelConfig,
   ThinkingLevel,
+  ThinkingMode,
   ThemeMode
 } from '@shared/types'
 import { ALL_THINKING_LEVELS } from '@shared/types'
@@ -16,22 +17,80 @@ function uid(): string {
   return crypto.randomUUID()
 }
 
-/** 从模型支持的等级中选一个默认等级（优先 medium） */
+/** 从模型支持的等级中选一个默认等级（优先 medium，其次首个非 default，否则 default） */
 function defaultLevel(levels: ThinkingLevel[]): ThinkingLevel | null {
   if (levels.length === 0) return null
   if (levels.includes('medium')) return 'medium'
-  return levels[0]
+  const nonDefault = levels.find((l) => l !== 'default')
+  return nonDefault ?? levels[0]
 }
 
-/** 根据模型思考类型推导默认思考状态 */
+/** 根据模型支持的思考模式推导默认思考状态 */
 function thinkingStateForModel(model: ModelConfig): {
-  thinkingEnabled: boolean
+  thinkingMode: ThinkingMode
   thinkingLevel: ThinkingLevel | null
 } {
-  if (model.thinkingType === 'non-thinking') {
-    return { thinkingEnabled: false, thinkingLevel: null }
+  const modes = model.thinkingModes
+  const mode: ThinkingMode = modes.includes('enabled')
+    ? 'enabled'
+    : (modes[0] ?? 'default')
+  const level =
+    mode === 'enabled'
+      ? (defaultLevel(model.thinkingLevels) ?? 'default')
+      : 'default'
+  return { thinkingMode: mode, thinkingLevel: level }
+}
+
+/** 兼容旧版本数据：把 thinkingLevels 规范化 */
+function normalizeLevels(levels: unknown): ThinkingLevel[] {
+  if (!Array.isArray(levels) || levels.length === 0) return ['default']
+  return levels as ThinkingLevel[]
+}
+
+/** 兼容旧版本数据：把旧 thinkingType 迁移为 thinkingModes */
+function normalizeModel(m: ModelConfig): ModelConfig {
+  if (Array.isArray((m as unknown as { thinkingModes?: unknown }).thinkingModes)) {
+    const raw = m as unknown as {
+      thinkingModes: ThinkingMode[]
+      thinkingLevels: ThinkingLevel[]
+    }
+    return {
+      ...m,
+      thinkingModes: [...raw.thinkingModes],
+      thinkingLevels: normalizeLevels(raw.thinkingLevels)
+    }
   }
-  return { thinkingEnabled: true, thinkingLevel: defaultLevel(model.thinkingLevels) }
+  // 旧格式：thinkingType
+  let modes: ThinkingMode[]
+  switch ((m as unknown as { thinkingType?: string }).thinkingType) {
+    case 'thinking':
+      modes = ['enabled']
+      break
+    case 'non-thinking':
+      modes = ['disabled']
+      break
+    case 'selectable':
+      modes = ['enabled', 'disabled']
+      break
+    default:
+      modes = ['default']
+  }
+  return {
+    ...m,
+    thinkingModes: modes,
+    thinkingLevels: normalizeLevels(
+      (m as unknown as { thinkingLevels?: ThinkingLevel[] }).thinkingLevels
+    )
+  }
+}
+
+/** 兼容旧版本数据：把旧 thinkingEnabled 迁移为 thinkingMode */
+function normalizeConversation(c: Conversation): Conversation {
+  if (typeof (c as unknown as { thinkingMode?: unknown }).thinkingMode === 'string') {
+    return c
+  }
+  const enabled = (c as unknown as { thinkingEnabled?: boolean }).thinkingEnabled
+  return { ...c, thinkingMode: enabled ? 'enabled' : 'disabled' }
 }
 
 /** 由首条用户消息生成对话标题 */
@@ -83,7 +142,7 @@ interface ChatboxState {
   renameConversation: (id: string, title: string) => void
   clearMessages: (id: string) => void
   setCurrentModel: (modelId: string) => void
-  setThinkingEnabled: (enabled: boolean) => void
+  setThinkingMode: (mode: ThinkingMode) => void
   setThinkingLevel: (level: ThinkingLevel) => void
   setThinkingLevelFor: (convId: string, level: ThinkingLevel) => void
 
@@ -208,11 +267,29 @@ export const useStore = create<ChatboxState>((set, get) => {
     streamingMessageId: null,
 
     async init() {
-      const [models, conversations, settings] = await Promise.all([
+      const [rawModels, rawConversations, settings] = await Promise.all([
         api.getModels(),
         api.getConversations(),
         api.getSettings()
       ])
+      // 兼容旧版本数据：迁移 thinkingType -> thinkingModes
+      const models = rawModels.map(normalizeModel)
+      const conversations = rawConversations
+        .map(normalizeConversation)
+        .map((c) => {
+          // 确保思考模式/强度落在对应模型支持范围内
+          const model = models.find((m) => m.id === c.modelId)
+          if (!model) return c
+          let thinkingMode = c.thinkingMode
+          if (!model.thinkingModes.includes(thinkingMode)) {
+            thinkingMode = model.thinkingModes[0] ?? 'default'
+          }
+          let thinkingLevel = c.thinkingLevel
+          if (thinkingLevel && !model.thinkingLevels.includes(thinkingLevel)) {
+            thinkingLevel = model.thinkingLevels[0] ?? null
+          }
+          return { ...c, thinkingMode, thinkingLevel }
+        })
       // 按更新时间倒序
       conversations.sort((a, b) => b.updatedAt - a.updatedAt)
       set({
@@ -272,12 +349,12 @@ export const useStore = create<ChatboxState>((set, get) => {
       const model = state.models.find((m) => m.id === targetModelId)
       const thinking = model
         ? thinkingStateForModel(model)
-        : { thinkingEnabled: false, thinkingLevel: null }
+        : { thinkingMode: 'default' as ThinkingMode, thinkingLevel: null }
       const conversation: Conversation = {
         id: uid(),
         title: '新对话',
         modelId: targetModelId,
-        thinkingEnabled: thinking.thinkingEnabled,
+        thinkingMode: thinking.thinkingMode,
         thinkingLevel: thinking.thinkingLevel,
         messages: [],
         createdAt: now,
@@ -332,14 +409,14 @@ export const useStore = create<ChatboxState>((set, get) => {
       const model = state.models.find((m) => m.id === modelId)
       const thinking = model
         ? thinkingStateForModel(model)
-        : { thinkingEnabled: false, thinkingLevel: null }
+        : { thinkingMode: 'default' as ThinkingMode, thinkingLevel: null }
       set((s) => ({
         conversations: s.conversations.map((c) =>
           c.id === convId
             ? {
                 ...c,
                 modelId,
-                thinkingEnabled: thinking.thinkingEnabled,
+                thinkingMode: thinking.thinkingMode,
                 thinkingLevel: thinking.thinkingLevel
               }
             : c
@@ -348,22 +425,13 @@ export const useStore = create<ChatboxState>((set, get) => {
       void persistConversation(convId)
     },
 
-    setThinkingEnabled(enabled) {
+    setThinkingMode(mode) {
       const state = get()
       const convId = state.currentConversationId
       if (!convId) return
-      const conv = state.conversations.find((c) => c.id === convId)
-      const model = state.models.find((m) => m.id === conv?.modelId)
-      // 开启时确保有一个有效等级
-      let level = conv?.thinkingLevel ?? null
-      if (enabled && (!level || !(model?.thinkingLevels ?? []).includes(level))) {
-        level = defaultLevel(model?.thinkingLevels ?? [])
-      }
       set((s) => ({
         conversations: s.conversations.map((c) =>
-          c.id === convId
-            ? { ...c, thinkingEnabled: enabled, thinkingLevel: level }
-            : c
+          c.id === convId ? { ...c, thinkingMode: mode } : c
         )
       }))
       void persistConversation(convId)
@@ -451,17 +519,9 @@ export const useStore = create<ChatboxState>((set, get) => {
         apiMessages.push({ role: m.role, content: m.content })
       }
 
-      // 决定是否启用思考
-      const thinkingEnabled =
-        model.thinkingType === 'thinking'
-          ? true
-          : model.thinkingType === 'selectable'
-            ? conv.thinkingEnabled
-            : false
-      const thinkingLevel =
-        thinkingEnabled && conv.thinkingLevel
-          ? conv.thinkingLevel
-          : defaultLevel(model.thinkingLevels)
+      // 思考模式与强度直接取当前对话设置（已约束在模型支持范围内）
+      const thinkingMode: ThinkingMode = conv.thinkingMode
+      const thinkingLevel: ThinkingLevel | null = conv.thinkingLevel
 
       try {
         const requestId = await api.chatSend({
@@ -475,8 +535,8 @@ export const useStore = create<ChatboxState>((set, get) => {
           presencePenalty: model.presencePenalty,
           frequencyPenalty: model.frequencyPenalty,
           maxTokens: model.maxTokens,
-          thinkingEnabled,
-          thinkingLevel: thinkingEnabled ? thinkingLevel : null
+          thinkingMode,
+          thinkingLevel
         })
         set({ currentRequestId: requestId })
       } catch (err) {

@@ -1198,53 +1198,11 @@ select {
 }
 
 /* ===== Thinking Type Options ===== */
-.thinking-type-options {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-
-.radio-card {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 12px;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  transition: all 0.12s;
-}
-
-.radio-card:hover {
-  background: var(--bg-hover);
-}
-
-.radio-card.checked {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-}
-
-.radio-card input[type='radio'] {
-  margin-top: 2px;
-  accent-color: var(--accent);
-}
-
-.radio-card-body {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.radio-card-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.radio-card-desc {
+.thinking-type-desc {
+  margin: -4px 0 16px;
   font-size: 12px;
   color: var(--text-muted);
+  line-height: 1.5;
 }
 
 .thinking-levels {

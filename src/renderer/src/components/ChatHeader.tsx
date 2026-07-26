@@ -1,15 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../store'
-import type { ModelConfig, ThinkingLevel } from '@shared/types'
+import type { ModelConfig, ThinkingLevel, ThinkingMode } from '@shared/types'
 import { ChevronDownIcon, BrainIcon, TrashIcon } from './Icons'
 import { ALL_THINKING_LEVELS } from '@shared/types'
 
 const LEVEL_LABEL: Record<ThinkingLevel, string> = {
+  default: '默认',
   low: '低',
   medium: '中',
   high: '高',
   xhigh: '超高',
-  max: '最大'
+  max: '极致'
 }
 
 export function ChatHeader() {
@@ -17,7 +18,7 @@ export function ChatHeader() {
   const conversations = useStore((s) => s.conversations)
   const currentId = useStore((s) => s.currentConversationId)
   const setCurrentModel = useStore((s) => s.setCurrentModel)
-  const setThinkingEnabled = useStore((s) => s.setThinkingEnabled)
+  const setThinkingMode = useStore((s) => s.setThinkingMode)
   const setThinkingLevel = useStore((s) => s.setThinkingLevel)
   const clearMessages = useStore((s) => s.clearMessages)
   const setSettingsOpen = useStore((s) => s.setSettingsOpen)
@@ -45,21 +46,25 @@ export function ChatHeader() {
 
   const currentModel = models.find((m) => m.id === conv.modelId)
 
-  // 思考相关：只有 selectable 类型才显示开关
+  // 思考模式：模型支持多种模式且可开可关时，才显示思考开关
+  const modes = currentModel?.thinkingModes ?? []
+  const hasEnabled = modes.includes('enabled')
+  const hasDisabled = modes.includes('disabled')
+  const hasDefault = modes.includes('default')
+  const canToggleOff = hasDisabled || hasDefault
   const showThinkingToggle =
-    currentModel && currentModel.thinkingType === 'selectable'
-  const showThinkingLevel =
-    showThinkingToggle &&
-    conv.thinkingEnabled &&
-    (currentModel?.thinkingLevels.length ?? 0) > 0
+    hasEnabled && canToggleOff && modes.length >= 2
 
-  // 对于 thinking 类型，如果支持多个等级，则展示强度选择（默认开启）
-  const showLevelForThinkingOnly =
-    currentModel &&
-    currentModel.thinkingType === 'thinking' &&
-    currentModel.thinkingLevels.length > 0
+  // 当前是否处于思考模式
+  const thinkingOn = conv.thinkingMode === 'enabled'
+  // 关闭思考时使用的模式（优先 disabled，否则 default）
+  const offMode: ThinkingMode = hasDisabled ? 'disabled' : 'default'
+
+  // 思考强度：仅在思考开启且存在多个可选等级时显示
+  const levels = currentModel?.thinkingLevels ?? []
+  const showThinkingLevel = thinkingOn && levels.length > 1
   const levelOptions = ALL_THINKING_LEVELS.filter((lv) =>
-    (currentModel?.thinkingLevels ?? []).includes(lv)
+    levels.includes(lv)
   )
 
   return (
@@ -115,15 +120,15 @@ export function ChatHeader() {
           )}
         </div>
 
-        {/* 思考开关（仅 selectable） */}
+        {/* 思考开关（模型支持多种思考模式时显示） */}
         {showThinkingToggle && (
           <label className="thinking-toggle" title="开启后模型会先思考再回答">
             <BrainIcon width={16} height={16} />
             <span>思考</span>
             <button
               type="button"
-              className={`switch ${conv.thinkingEnabled ? 'on' : ''}`}
-              onClick={() => setThinkingEnabled(!conv.thinkingEnabled)}
+              className={`switch ${thinkingOn ? 'on' : ''}`}
+              onClick={() => setThinkingMode(thinkingOn ? offMode : 'enabled')}
             >
               <span className="switch-knob" />
             </button>
@@ -131,7 +136,7 @@ export function ChatHeader() {
         )}
 
         {/* 思考强度选择 */}
-        {(showThinkingLevel || showLevelForThinkingOnly) && (
+        {showThinkingLevel && (
           <div className="dropdown" ref={levelRef}>
             <button
               className="dropdown-trigger level-trigger"
