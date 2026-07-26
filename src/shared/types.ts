@@ -122,7 +122,7 @@ export interface ChatRequestParams {
   apiBase: string
   apiKey: string
   modelId: string
-  messages: { role: MessageRole; content: string }[]
+  messages: { role: MessageRole; content: string; reasoning_content?: string }[]
   temperature: number | null
   topP: number | null
   n: number | null

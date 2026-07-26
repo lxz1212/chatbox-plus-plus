@@ -590,9 +590,19 @@ export const useStore = create<ChatboxState>((set, get) => {
         if (toShow) void api.saveConversation(toShow)
       }
 
+      // 思考模式与强度直接取当前对话设置（已约束在模型支持范围内）
+      const thinkingMode: ThinkingMode = conv.thinkingMode
+      const thinkingLevel: ThinkingLevel | null = conv.thinkingLevel
+      // 当前轮次开启思考时，需把历史 assistant 的 reasoning_content 完整回传
+      const thinkingEnabled = thinkingMode === 'enabled'
+
       // 构建发送给 API 的消息列表
       const sysPrompt = state.settings.systemPrompt.trim()
-      const apiMessages: { role: 'user' | 'assistant' | 'system'; content: string }[] = []
+      const apiMessages: {
+        role: 'user' | 'assistant' | 'system'
+        content: string
+        reasoning_content?: string
+      }[] = []
       if (sysPrompt) {
         apiMessages.push({ role: 'system', content: sysPrompt })
       }
@@ -601,12 +611,17 @@ export const useStore = create<ChatboxState>((set, get) => {
       for (const m of latestConv.messages) {
         if (m.id === assistantMsg.id) continue
         if (m.content.trim() === '') continue
-        apiMessages.push({ role: m.role, content: m.content })
+        const msg: {
+          role: 'user' | 'assistant' | 'system'
+          content: string
+          reasoning_content?: string
+        } = { role: m.role, content: m.content }
+        // 思考开启时，完整回传历史 assistant 消息的 reasoning_content
+        if (thinkingEnabled && m.role === 'assistant' && m.reasoning) {
+          msg.reasoning_content = m.reasoning
+        }
+        apiMessages.push(msg)
       }
-
-      // 思考模式与强度直接取当前对话设置（已约束在模型支持范围内）
-      const thinkingMode: ThinkingMode = conv.thinkingMode
-      const thinkingLevel: ThinkingLevel | null = conv.thinkingLevel
 
       try {
         const requestId = await api.chatSend({

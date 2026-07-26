@@ -44,7 +44,6 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
     <aside className="sidebar">
       <div className="sidebar-header">
         <div className="brand">
-          <span className="brand-logo">＋</span>
           <span className="brand-name">Chatbox++</span>
         </div>
         <button className="new-chat-btn" onClick={() => createConversation()}>
