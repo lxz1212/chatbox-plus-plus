@@ -83,16 +83,16 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
         <div className="settings-layout">
           <div className="settings-tabs">
             <button
-              className={`settings-tab ${tab === 'models' ? 'active' : ''}`}
-              onClick={() => setSettingsOpen(true, 'models')}
-            >
-              模型管理
-            </button>
-            <button
               className={`settings-tab ${tab === 'general' ? 'active' : ''}`}
               onClick={() => setSettingsOpen(true, 'general')}
             >
               通用设置
+            </button>
+            <button
+              className={`settings-tab ${tab === 'models' ? 'active' : ''}`}
+              onClick={() => setSettingsOpen(true, 'models')}
+            >
+              模型管理
             </button>
           </div>
 

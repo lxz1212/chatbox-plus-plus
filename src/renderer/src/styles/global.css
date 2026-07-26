@@ -1182,6 +1182,7 @@ select {
 
 .textarea-input {
   resize: vertical;
+  width: 100%;
   min-height: 80px;
   font-family: inherit;
   line-height: 1.6;

@@ -44,13 +44,9 @@ npm run dev
 npm start
 ```
 
-`npm start` 采用「非必要不重新构建」策略：
+`npm start` 等同于 `electron-vite preview`，每次运行都会**重新构建后启动**。若修改源码后想快速预览，直接运行即可。
 
-- 若已存在构建产物（`out/main/index.js`），则**直接启动 Electron，跳过构建**
-- 若不存在产物，则自动构建一次再启动
-- 需要强制重建时使用 `npm start -- --rebuild` 或 `npm run start:rebuild`
-
-> 提示：修改源码后若希望 `npm start` 反映最新改动，请先 `npm run build`，或使用带 `--rebuild` 的启动命令。开发阶段推荐使用 `npm run dev`（带热重载）。
+> 提示：开发阶段推荐使用 `npm run dev`（带热重载），无需每次手动重建。
 
 ### 类型检查
 

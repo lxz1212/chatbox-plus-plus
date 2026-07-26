@@ -259,7 +259,7 @@ export const useStore = create<ChatboxState>((set, get) => {
     settings: { theme: 'system', systemPrompt: '', defaultModelId: null },
     currentConversationId: null,
     settingsOpen: false,
-    settingsTab: 'models',
+    settingsTab: 'general',
 
     isStreaming: false,
     currentRequestId: null,
@@ -579,7 +579,7 @@ export const useStore = create<ChatboxState>((set, get) => {
       await api.saveSettings(next)
     },
 
-    setSettingsOpen(open, tab = 'models') {
+    setSettingsOpen(open, tab = 'general') {
       set({ settingsOpen: open, settingsTab: tab })
     },
 

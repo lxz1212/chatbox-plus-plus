@@ -60,7 +60,7 @@ export default function App() {
 
   return (
     <div className={`app ${isDark ? 'dark' : 'light'}`}>
-      <Sidebar onOpenSettings={() => setSettingsOpen(true, 'models')} />
+      <Sidebar onOpenSettings={() => setSettingsOpen(true)} />
 
       <main className="chat-area">
         {currentConv ? (
