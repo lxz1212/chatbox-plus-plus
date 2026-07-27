@@ -60,6 +60,8 @@ export interface ModelConfig {
   thinkingModes: ThinkingMode[]
   /** 该模型支持的思考强度等级集合（多选） */
   thinkingLevels: ThinkingLevel[]
+  /** 思考模式为"默认"时是否允许选择思考强度（false 时默认模式始终不发送 reasoning_effort） */
+  allowEffortInDefault: boolean
   /** 创建时间 */
   createdAt: number
   /** 更新时间 */
@@ -115,6 +117,8 @@ export interface AppSettings {
   systemPrompt: string
   /** 默认模型 ID（新建对话时使用） */
   defaultModelId: string | null
+  /** 上次使用的模型 ID（默认模型设为"自动"时使用） */
+  lastUsedModelId: string | null
 }
 
 /** 发起对话请求时传给主进程的参数 */

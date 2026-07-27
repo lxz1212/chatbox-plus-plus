@@ -12,6 +12,7 @@ function createWindow(): void {
     show: false,
     autoHideMenuBar: true,
     title: 'Chatbox++',
+    icon: join(__dirname, '../../resources/icon.png'),
     backgroundColor: '#f7f7f8',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),

@@ -13,6 +13,15 @@ const LEVEL_LABEL: Record<ThinkingLevel, string> = {
   max: '极致'
 }
 
+const MODE_LABEL: Record<ThinkingMode, string> = {
+  default: '默认',
+  enabled: '开启',
+  disabled: '关闭'
+}
+
+/** 思考模式下拉菜单的固定排列顺序 */
+const THINKING_MODE_ORDER: ThinkingMode[] = ['default', 'enabled', 'disabled']
+
 export function ChatHeader() {
   const models = useStore((s) => s.models)
   const conversations = useStore((s) => s.conversations)
@@ -25,14 +34,19 @@ export function ChatHeader() {
 
   const conv = conversations.find((c) => c.id === currentId)
   const [modelOpen, setModelOpen] = useState(false)
+  const [modeOpen, setModeOpen] = useState(false)
   const [levelOpen, setLevelOpen] = useState(false)
   const modelRef = useRef<HTMLDivElement>(null)
+  const modeRef = useRef<HTMLDivElement>(null)
   const levelRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     function handler(e: MouseEvent): void {
       if (modelRef.current && !modelRef.current.contains(e.target as Node)) {
         setModelOpen(false)
+      }
+      if (modeRef.current && !modeRef.current.contains(e.target as Node)) {
+        setModeOpen(false)
       }
       if (levelRef.current && !levelRef.current.contains(e.target as Node)) {
         setLevelOpen(false)
@@ -55,14 +69,19 @@ export function ChatHeader() {
   const showThinkingToggle =
     hasEnabled && canToggleOff && modes.length >= 2
 
+  // 思考模式可选项（按固定顺序：默认、开启、关闭）
+  const modeOptions = THINKING_MODE_ORDER.filter((m) => modes.includes(m))
+
   // 当前是否处于思考模式
   const thinkingOn = conv.thinkingMode === 'enabled'
-  // 关闭思考时使用的模式（优先 disabled，否则 default）
-  const offMode: ThinkingMode = hasDisabled ? 'disabled' : 'default'
 
-  // 思考强度：仅在思考开启且存在多个可选等级时显示
+  // 思考强度：开启思考时显示；"默认"模式下仅当模型允许选择强度时显示
   const levels = currentModel?.thinkingLevels ?? []
-  const showThinkingLevel = thinkingOn && levels.length > 1
+  const allowEffortInDefault = !!currentModel?.allowEffortInDefault
+  const showThinkingLevel =
+    (thinkingOn ||
+      (conv.thinkingMode === 'default' && allowEffortInDefault)) &&
+    levels.length > 1
   const levelOptions = ALL_THINKING_LEVELS.filter((lv) =>
     levels.includes(lv)
   )
@@ -80,9 +99,6 @@ export function ChatHeader() {
             <span className="model-name">
               {currentModel ? currentModel.name : '选择模型'}
             </span>
-            {currentModel && (
-              <span className="model-id">{currentModel.modelId}</span>
-            )}
             <ChevronDownIcon width={16} height={16} />
           </button>
           {modelOpen && (
@@ -120,19 +136,36 @@ export function ChatHeader() {
           )}
         </div>
 
-        {/* 思考开关（模型支持多种思考模式时显示） */}
+        {/* 思考模式下拉菜单（模型支持多种思考模式时显示） */}
         {showThinkingToggle && (
-          <label className="thinking-toggle" title="开启后模型会先思考再回答">
-            <BrainIcon width={16} height={16} />
-            <span>思考</span>
+          <div className="dropdown" ref={modeRef}>
             <button
-              type="button"
-              className={`switch ${thinkingOn ? 'on' : ''}`}
-              onClick={() => setThinkingMode(thinkingOn ? offMode : 'enabled')}
+              className="dropdown-trigger mode-trigger"
+              onClick={() => setModeOpen((v) => !v)}
+              title="思考模式"
             >
-              <span className="switch-knob" />
+              <BrainIcon width={16} height={16} />
+              <span>思考：{MODE_LABEL[conv.thinkingMode]}</span>
+              <ChevronDownIcon width={14} height={14} />
             </button>
-          </label>
+            {modeOpen && (
+              <div className="dropdown-menu">
+                {modeOptions.map((mode) => (
+                  <div
+                    key={mode}
+                    className={`dropdown-item ${conv.thinkingMode === mode ? 'selected' : ''}`}
+                    onClick={() => {
+                      setThinkingMode(mode)
+                      setModeOpen(false)
+                    }}
+                  >
+                    <span>{MODE_LABEL[mode]}</span>
+                    {conv.thinkingMode === mode && <span className="dot">●</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         )}
 
         {/* 思考强度选择 */}

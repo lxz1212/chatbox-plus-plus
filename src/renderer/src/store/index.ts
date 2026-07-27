@@ -41,6 +41,23 @@ function thinkingStateForModel(model: ModelConfig): {
   return { thinkingMode: mode, thinkingLevel: level }
 }
 
+/**
+ * 选择新建对话使用的模型 ID。
+ * 优先级：显式传入 > 默认模型 > 上次使用的模型（仅默认为"自动"时）> 第一个模型
+ */
+function resolveModelId(
+  models: ModelConfig[],
+  settings: AppSettings,
+  explicitId?: string | null
+): string {
+  const exists = (id: string | null | undefined): id is string =>
+    !!id && models.some((m) => m.id === id)
+  if (exists(explicitId)) return explicitId
+  if (exists(settings.defaultModelId)) return settings.defaultModelId
+  if (exists(settings.lastUsedModelId)) return settings.lastUsedModelId
+  return models[0]?.id ?? ''
+}
+
 /** 兼容旧版本数据：把 thinkingLevels 规范化 */
 function normalizeLevels(levels: unknown): ThinkingLevel[] {
   if (!Array.isArray(levels) || levels.length === 0) return ['default']
@@ -57,7 +74,9 @@ function normalizeModel(m: ModelConfig): ModelConfig {
     return {
       ...m,
       thinkingModes: [...raw.thinkingModes],
-      thinkingLevels: normalizeLevels(raw.thinkingLevels)
+      thinkingLevels: normalizeLevels(raw.thinkingLevels),
+      allowEffortInDefault:
+        (m as unknown as { allowEffortInDefault?: boolean }).allowEffortInDefault ?? false
     }
   }
   // 旧格式：thinkingType
@@ -80,7 +99,9 @@ function normalizeModel(m: ModelConfig): ModelConfig {
     thinkingModes: modes,
     thinkingLevels: normalizeLevels(
       (m as unknown as { thinkingLevels?: ThinkingLevel[] }).thinkingLevels
-    )
+    ),
+    allowEffortInDefault:
+      (m as unknown as { allowEffortInDefault?: boolean }).allowEffortInDefault ?? false
   }
 }
 
@@ -277,7 +298,7 @@ export const useStore = create<ChatboxState>((set, get) => {
     initialized: false,
     models: [],
     conversations: [],
-    settings: { theme: 'system', systemPrompt: '', defaultModelId: null },
+    settings: { theme: 'system', systemPrompt: '', defaultModelId: null, lastUsedModelId: null },
     currentConversationId: null,
     settingsOpen: false,
     settingsTab: 'general',
@@ -310,12 +331,21 @@ export const useStore = create<ChatboxState>((set, get) => {
           if (thinkingLevel && !model.thinkingLevels.includes(thinkingLevel)) {
             thinkingLevel = model.thinkingLevels[0] ?? null
           }
+          // "默认"模式且不允许选择强度时，强制不发送 reasoning_effort
+          if (thinkingMode === 'default' && !model.allowEffortInDefault) {
+            thinkingLevel = 'default'
+          }
           return { ...c, thinkingMode, thinkingLevel }
         })
       // 按更新时间倒序
       conversations.sort((a, b) => b.updatedAt - a.updatedAt)
+      // 兼容旧版本数据：补全 lastUsedModelId 字段
+      const normalizedSettings: AppSettings = {
+        ...settings,
+        lastUsedModelId: settings.lastUsedModelId ?? null
+      }
       // 打开软件时自动创建一个隐藏的草稿对话并进入
-      const draftModelId = settings.defaultModelId ?? models[0]?.id ?? ''
+      const draftModelId = resolveModelId(models, normalizedSettings)
       const draftModel = models.find((m) => m.id === draftModelId)
       const draftThinking = draftModel
         ? thinkingStateForModel(draftModel)
@@ -335,7 +365,7 @@ export const useStore = create<ChatboxState>((set, get) => {
       set({
         models,
         conversations: [draft, ...conversations],
-        settings,
+        settings: normalizedSettings,
         initialized: true,
         currentConversationId: draft.id
       })
@@ -373,12 +403,16 @@ export const useStore = create<ChatboxState>((set, get) => {
         if (settings.defaultModelId === id) {
           settings.defaultModelId = models[0]?.id ?? null
         }
+        if (settings.lastUsedModelId === id) {
+          settings.lastUsedModelId = models[0]?.id ?? null
+        }
         // 对话中引用了该模型的，清空引用
         const conversations = state.conversations.map((c) =>
           c.modelId === id ? { ...c, modelId: '' } : c
         )
         return { models, settings, conversations }
       })
+      void api.saveSettings(get().settings)
     },
 
     createConversation(modelId) {
@@ -393,8 +427,7 @@ export const useStore = create<ChatboxState>((set, get) => {
         ? state.conversations.filter((c) => c.id !== currentConv!.id)
         : state.conversations
 
-      const targetModelId =
-        modelId ?? state.settings.defaultModelId ?? state.models[0]?.id ?? ''
+      const targetModelId = resolveModelId(state.models, state.settings, modelId)
       const now = Date.now()
       const model = state.models.find((m) => m.id === targetModelId)
       const thinking = model
@@ -491,19 +524,28 @@ export const useStore = create<ChatboxState>((set, get) => {
                 thinkingLevel: thinking.thinkingLevel
               }
             : c
-        )
+        ),
+        settings: { ...s.settings, lastUsedModelId: modelId }
       }))
       void persistConversation(convId)
+      void api.saveSettings(get().settings)
     },
 
     setThinkingMode(mode) {
       const state = get()
       const convId = state.currentConversationId
       if (!convId) return
+      const conv = state.conversations.find((c) => c.id === convId)
+      const model = state.models.find((m) => m.id === conv?.modelId)
       set((s) => ({
-        conversations: s.conversations.map((c) =>
-          c.id === convId ? { ...c, thinkingMode: mode } : c
-        )
+        conversations: s.conversations.map((c) => {
+          if (c.id !== convId) return c
+          // 切换到"默认"模式且不允许选择强度时，重置强度为 default（不发送 reasoning_effort）
+          if (mode === 'default' && !model?.allowEffortInDefault) {
+            return { ...c, thinkingMode: mode, thinkingLevel: 'default' }
+          }
+          return { ...c, thinkingMode: mode }
+        })
       }))
       void persistConversation(convId)
     },
@@ -557,6 +599,12 @@ export const useStore = create<ChatboxState>((set, get) => {
         return
       }
 
+      // 记录上次使用的模型（供"自动"模式使用）
+      if (state.settings.lastUsedModelId !== conv.modelId) {
+        set((s) => ({ settings: { ...s.settings, lastUsedModelId: conv.modelId } }))
+        void api.saveSettings(get().settings)
+      }
+
       const userMsg: ChatMessage = {
         ...emptyMessage('user'),
         content: text
@@ -592,7 +640,11 @@ export const useStore = create<ChatboxState>((set, get) => {
 
       // 思考模式与强度直接取当前对话设置（已约束在模型支持范围内）
       const thinkingMode: ThinkingMode = conv.thinkingMode
-      const thinkingLevel: ThinkingLevel | null = conv.thinkingLevel
+      // "默认"模式且不允许选择强度时，强制不发送 reasoning_effort
+      const thinkingLevel: ThinkingLevel | null =
+        thinkingMode === 'default' && !model.allowEffortInDefault
+          ? 'default'
+          : conv.thinkingLevel
       // 当前轮次开启思考时，需把历史 assistant 的 reasoning_content 完整回传
       const thinkingEnabled = thinkingMode === 'enabled'
 

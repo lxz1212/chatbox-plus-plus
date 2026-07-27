@@ -40,14 +40,19 @@ const DEFAULT_FORM = {
   frequencyPenalty: '',
   maxTokens: '',
   thinkingModes: ['default'] as ThinkingMode[],
-  thinkingLevels: ['default'] as ThinkingLevel[]
+  thinkingLevels: ['default'] as ThinkingLevel[],
+  allowEffortInDefault: false
 }
 
 export function ModelForm({ initial, onSave, onCancel }: ModelFormProps) {
   const [form, setForm] = useState(DEFAULT_FORM)
   const [error, setError] = useState('')
+  const [modeError, setModeError] = useState('')
+  const [levelError, setLevelError] = useState('')
 
   useEffect(() => {
+    setModeError('')
+    setLevelError('')
     if (initial) {
       setForm({
         name: initial.name,
@@ -70,7 +75,8 @@ export function ModelForm({ initial, onSave, onCancel }: ModelFormProps) {
         thinkingModes: Array.isArray(initial.thinkingModes)
           ? [...initial.thinkingModes]
           : ['default'],
-        thinkingLevels: [...initial.thinkingLevels]
+        thinkingLevels: [...initial.thinkingLevels],
+        allowEffortInDefault: initial.allowEffortInDefault ?? false
       })
     } else {
       setForm(DEFAULT_FORM)
@@ -83,6 +89,7 @@ export function ModelForm({ initial, onSave, onCancel }: ModelFormProps) {
   }
 
   function toggleLevel(level: ThinkingLevel): void {
+    setLevelError('')
     setForm((f) => ({
       ...f,
       thinkingLevels: f.thinkingLevels.includes(level)
@@ -92,6 +99,7 @@ export function ModelForm({ initial, onSave, onCancel }: ModelFormProps) {
   }
 
   function toggleMode(mode: ThinkingMode): void {
+    setModeError('')
     setForm((f) => ({
       ...f,
       thinkingModes: f.thinkingModes.includes(mode)
@@ -106,11 +114,16 @@ export function ModelForm({ initial, onSave, onCancel }: ModelFormProps) {
     if (!form.apiKey.trim()) return setError('请填写 API Key')
     if (!form.modelId.trim()) return setError('请填写模型 ID')
 
+    setModeError('')
+    setLevelError('')
     if (form.thinkingModes.length === 0) {
-      return setError('至少需要勾选一个思考模式')
+      setModeError('请至少勾选一个思考模式')
     }
     if (form.thinkingLevels.length === 0) {
-      return setError('至少需要勾选一个思考强度等级')
+      setLevelError('请至少勾选一个思考强度等级')
+    }
+    if (form.thinkingModes.length === 0 || form.thinkingLevels.length === 0) {
+      return
     }
 
     const num = (v: string): number | null => {
@@ -131,7 +144,8 @@ export function ModelForm({ initial, onSave, onCancel }: ModelFormProps) {
       frequencyPenalty: num(form.frequencyPenalty),
       maxTokens: num(form.maxTokens),
       thinkingModes: [...form.thinkingModes],
-      thinkingLevels: [...form.thinkingLevels]
+      thinkingLevels: [...form.thinkingLevels],
+      allowEffortInDefault: form.allowEffortInDefault
     })
   }
 
@@ -289,6 +303,17 @@ export function ModelForm({ initial, onSave, onCancel }: ModelFormProps) {
                 )
               })}
             </div>
+            {modeError && <p className="levels-error">{modeError}</p>}
+            {form.thinkingModes.includes('default') && (
+              <label className="form-checkbox">
+                <input
+                  type="checkbox"
+                  checked={form.allowEffortInDefault}
+                  onChange={(e) => set('allowEffortInDefault', e.target.checked)}
+                />
+                <span>思考模式为「默认」时，允许在对话中选择思考强度</span>
+              </label>
+            )}
           </div>
 
           <div className="form-section">
@@ -311,6 +336,7 @@ export function ModelForm({ initial, onSave, onCancel }: ModelFormProps) {
                 )
               })}
             </div>
+            {levelError && <p className="levels-error">{levelError}</p>}
           </div>
         </div>
 

@@ -199,7 +199,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
                       })
                     }
                   >
-                    <option value="">不设置默认模型</option>
+                    <option value="">自动（使用上次使用的模型）</option>
                     {models.map((m) => (
                       <option key={m.id} value={m.id}>
                         {m.name}（{m.modelId}）

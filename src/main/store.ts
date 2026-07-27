@@ -17,7 +17,8 @@ interface AppData {
 const DEFAULT_SETTINGS: AppSettings = {
   theme: 'system',
   systemPrompt: '',
-  defaultModelId: null
+  defaultModelId: null,
+  lastUsedModelId: null
 }
 
 function defaultData(): AppData {
