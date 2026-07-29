@@ -148,7 +148,7 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
           <span className="footer-btn-icon">⚙</span>
           <span>设置</span>
         </button>
-        <span className="version-text">v1.3.1</span>
+        <span className="version-text">v1.3.2</span>
       </div>
     </aside>
   )

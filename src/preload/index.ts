@@ -13,6 +13,10 @@ const chatbox = {
   getAppVersion: (): Promise<string> => ipcRenderer.invoke('app:version'),
   platform: process.platform,
 
+  // 在系统浏览器中打开外部链接
+  openExternal: (url: string): Promise<void> =>
+    ipcRenderer.invoke('shell:openExternal', url),
+
   // 模型
   getModels: (): Promise<ModelConfig[]> => ipcRenderer.invoke('store:getModels'),
   saveModel: (model: ModelConfig): Promise<ModelConfig> =>

@@ -44,6 +44,19 @@
     sans-serif;
   --font-mono: 'SF Mono', 'Menlo', 'Monaco', 'Consolas', 'Courier New',
     monospace;
+
+  /* 代码语法高亮（highlight.js）配色 —— 浅色 */
+  --hl-comment: #6e7781;
+  --hl-keyword: #cf222e;
+  --hl-string: #0a3069;
+  --hl-number: #0550ae;
+  --hl-function: #8250df;
+  --hl-type: #953800;
+  --hl-tag: #116329;
+  --hl-variable: #953800;
+  --hl-meta: #6e7781;
+  --hl-addition-bg: rgba(63, 185, 80, 0.15);
+  --hl-deletion-bg: rgba(248, 81, 73, 0.15);
 }
 
 :root[data-theme='dark'] {
@@ -75,6 +88,19 @@
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5);
   --shadow-xl: 0 24px 48px rgba(0, 0, 0, 0.6);
+
+  /* 代码语法高亮（highlight.js）配色 —— 深色 */
+  --hl-comment: #8b949e;
+  --hl-keyword: #ff7b72;
+  --hl-string: #a5d6ff;
+  --hl-number: #79c0ff;
+  --hl-function: #d2a8ff;
+  --hl-type: #ffa657;
+  --hl-tag: #7ee787;
+  --hl-variable: #ffa657;
+  --hl-meta: #8b949e;
+  --hl-addition-bg: rgba(63, 185, 80, 0.2);
+  --hl-deletion-bg: rgba(248, 81, 73, 0.2);
 }
 
 * {
@@ -1415,4 +1441,186 @@ select {
   .form-grid-3 {
     grid-template-columns: repeat(2, 1fr);
   }
+}
+
+/* ============================================================
+   代码语法高亮（highlight.js）
+   配色随浅色/深色主题切换（见 :root 变量）
+   ============================================================ */
+.hljs-comment,
+.hljs-quote {
+  color: var(--hl-comment);
+  font-style: italic;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal,
+.hljs-name {
+  color: var(--hl-keyword);
+}
+
+.hljs-string,
+.hljs-regexp,
+.hljs-meta .hljs-string {
+  color: var(--hl-string);
+}
+
+.hljs-number,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-link {
+  color: var(--hl-number);
+}
+
+.hljs-title,
+.hljs-title.function_,
+.hljs-section {
+  color: var(--hl-function);
+}
+
+.hljs-title.class_,
+.hljs-type,
+.hljs-built_in,
+.hljs-attr,
+.hljs-attribute,
+.hljs-property,
+.hljs-params {
+  color: var(--hl-type);
+}
+
+.hljs-tag {
+  color: var(--hl-tag);
+}
+
+.hljs-variable,
+.hljs-template-variable {
+  color: var(--hl-variable);
+}
+
+.hljs-meta,
+.hljs-meta .hljs-keyword {
+  color: var(--hl-meta);
+}
+
+.hljs-addition {
+  background: var(--hl-addition-bg);
+  display: inline-block;
+  width: 100%;
+}
+
+.hljs-deletion {
+  background: var(--hl-deletion-bg);
+  display: inline-block;
+  width: 100%;
+}
+
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-strong {
+  font-weight: 700;
+}
+
+/* ===== 应用内浏览器（webview） ===== */
+.in-app-browser {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-primary);
+}
+.iab-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+.iab-back-btn {
+  border: 1px solid var(--border-color);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  height: 32px;
+  padding: 0 14px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  transition: background 0.15s;
+}
+.iab-back-btn:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.iab-nav-btn {
+  border: none;
+  background: transparent;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 17px;
+  line-height: 1;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+.iab-nav-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+.iab-nav-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.iab-addr {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  padding: 6px 12px;
+  margin: 0 6px;
+  min-width: 0;
+}
+.iab-lock {
+  color: var(--success);
+  font-size: 13px;
+  flex-shrink: 0;
+}
+.iab-addr input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 13px;
+  color: var(--text-primary);
+  min-width: 0;
+}
+.iab-webview-container {
+  flex: 1;
+  display: flex;
+  background: var(--bg-secondary);
+}
+.iab-loading {
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  background-size: 200% 100%;
+  animation: iab-load 1.2s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes iab-load {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }

@@ -32,6 +32,21 @@ export const ALL_THINKING_MODES: ThinkingMode[] = [
   'disabled'
 ]
 
+/**
+ * 保留式思考（对应 thinking.keep 子字段）
+ * - 'default'：不传入，由服务端决定
+ * - 'enabled'：传入 keep="all"，多轮对话中保留完整 reasoning_content
+ * - 'disabled'：传入 keep=null，显式关闭
+ */
+export type ThinkingKeep = 'default' | 'enabled' | 'disabled'
+
+/** 全部可选的保留式思考选项 */
+export const ALL_THINKING_KEEPS: ThinkingKeep[] = [
+  'default',
+  'enabled',
+  'disabled'
+]
+
 /** 模型配置 */
 export interface ModelConfig {
   /** 唯一 ID */
@@ -62,6 +77,10 @@ export interface ModelConfig {
   thinkingLevels: ThinkingLevel[]
   /** 思考模式为"默认"时是否允许选择思考强度（false 时默认模式始终不发送 reasoning_effort） */
   allowEffortInDefault: boolean
+  /** 该模型支持的保留式思考选项集合（多选，对应 thinking.keep 子字段） */
+  thinkingKeeps: ThinkingKeep[]
+  /** 思考模式为"默认"时是否允许选择保留式思考（false 时默认模式始终不发送 thinking.keep） */
+  allowKeepInDefault: boolean
   /** 创建时间 */
   createdAt: number
   /** 更新时间 */
@@ -98,6 +117,8 @@ export interface Conversation {
   thinkingMode: ThinkingMode
   /** 当前选择的思考强度等级 */
   thinkingLevel: ThinkingLevel | null
+  /** 当前选择的保留式思考（对应 thinking.keep 子字段） */
+  thinkingKeep: ThinkingKeep
   /** 消息列表 */
   messages: ChatMessage[]
   /** 是否在侧边栏显示；新建的空对话为 false，发送首条消息后才显示并持久化 */
@@ -137,6 +158,8 @@ export interface ChatRequestParams {
   thinkingMode: ThinkingMode
   /** 思考强度等级（'default' 或 null 表示不传入 reasoning_effort） */
   thinkingLevel: ThinkingLevel | null
+  /** 保留式思考（'default' 表示不传入 thinking.keep） */
+  thinkingKeep: ThinkingKeep
 }
 
 /** 流式分片事件 */
@@ -166,6 +189,9 @@ export interface ChatErrorEvent {
 export interface ChatboxAPI {
   getAppVersion: () => Promise<string>
   platform: NodeJS.Platform
+
+  // 外部链接
+  openExternal: (url: string) => Promise<void>
 
   // 模型
   getModels: () => Promise<ModelConfig[]>

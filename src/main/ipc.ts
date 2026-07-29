@@ -1,4 +1,4 @@
-import { app, ipcMain } from 'electron'
+import { app, ipcMain, shell } from 'electron'
 import { getStore, randomUUID } from './store'
 import { abortChat, streamChat } from './chat'
 import type { ChatRequestParams } from '../shared/types'
@@ -6,6 +6,13 @@ import type { ChatRequestParams } from '../shared/types'
 export function registerIpcHandlers(): void {
   // 应用版本
   ipcMain.handle('app:version', () => app.getVersion())
+
+  // 在系统浏览器中打开外部链接
+  ipcMain.handle('shell:openExternal', (_e, url: string) => {
+    if (typeof url === 'string' && (url.startsWith('http://') || url.startsWith('https://'))) {
+      void shell.openExternal(url)
+    }
+  })
 
   // ---------- 模型 ----------
   ipcMain.handle('store:getModels', () => getStore().getModels())

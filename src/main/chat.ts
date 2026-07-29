@@ -30,9 +30,24 @@ function buildRequestBody(params: ChatRequestParams): Record<string, unknown> {
     body.frequency_penalty = params.frequencyPenalty
   if (params.maxTokens != null) body.max_tokens = params.maxTokens
 
-  // 思考模式：thinking.type（'default' 时不传入该字段，由服务端决定）
+  // 思考参数：thinking 对象（含 type 与 keep 两个子字段）
+  // - thinking.type：'default' 时不传入，由服务端决定
+  // - thinking.keep：'default' 时不传入；'enabled' 传 "all"（保留完整 reasoning）；
+  //   'disabled' 传 null（显式关闭保留式思考）；思考关闭(type=disabled)时不传入 keep
+  const thinking: Record<string, unknown> = {}
   if (params.thinkingMode && params.thinkingMode !== 'default') {
-    body.thinking = { type: params.thinkingMode }
+    thinking.type = params.thinkingMode
+  }
+  // 仅在思考开启或默认模式下发送 keep；思考关闭时不发送（思考已关闭，保留式思考无意义）
+  if (params.thinkingMode !== 'disabled') {
+    if (params.thinkingKeep === 'enabled') {
+      thinking.keep = 'all'
+    } else if (params.thinkingKeep === 'disabled') {
+      thinking.keep = null
+    }
+  }
+  if (Object.keys(thinking).length > 0) {
+    body.thinking = thinking
   }
 
   // 思考强度：reasoning_effort（'default' 或 null 时不传入）

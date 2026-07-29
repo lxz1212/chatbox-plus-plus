@@ -6,6 +6,7 @@ import type {
   ModelConfig,
   ThinkingLevel,
   ThinkingMode,
+  ThinkingKeep,
   ThemeMode
 } from '@shared/types'
 import { ALL_THINKING_LEVELS } from '@shared/types'
@@ -29,6 +30,7 @@ function defaultLevel(levels: ThinkingLevel[]): ThinkingLevel | null {
 function thinkingStateForModel(model: ModelConfig): {
   thinkingMode: ThinkingMode
   thinkingLevel: ThinkingLevel | null
+  thinkingKeep: ThinkingKeep
 } {
   const modes = model.thinkingModes
   const mode: ThinkingMode = modes.includes('enabled')
@@ -38,7 +40,8 @@ function thinkingStateForModel(model: ModelConfig): {
     mode === 'enabled'
       ? (defaultLevel(model.thinkingLevels) ?? 'default')
       : 'default'
-  return { thinkingMode: mode, thinkingLevel: level }
+  const keep = model.thinkingKeeps[0] ?? 'default'
+  return { thinkingMode: mode, thinkingLevel: level, thinkingKeep: keep }
 }
 
 /**
@@ -56,6 +59,12 @@ function resolveModelId(
   if (exists(settings.defaultModelId)) return settings.defaultModelId
   if (exists(settings.lastUsedModelId)) return settings.lastUsedModelId
   return models[0]?.id ?? ''
+}
+
+/** 兼容旧版本数据：把 thinkingKeeps 规范化（兼容旧的单选 thinkingKeep 字段） */
+function normalizeKeeps(keeps: ThinkingKeep[]): ThinkingKeep[] {
+  if (!Array.isArray(keeps) || keeps.length === 0) return ['default']
+  return keeps as ThinkingKeep[]
 }
 
 /** 兼容旧版本数据：把 thinkingLevels 规范化 */
@@ -76,7 +85,15 @@ function normalizeModel(m: ModelConfig): ModelConfig {
       thinkingModes: [...raw.thinkingModes],
       thinkingLevels: normalizeLevels(raw.thinkingLevels),
       allowEffortInDefault:
-        (m as unknown as { allowEffortInDefault?: boolean }).allowEffortInDefault ?? false
+        (m as unknown as { allowEffortInDefault?: boolean }).allowEffortInDefault ?? false,
+      allowKeepInDefault:
+        (m as unknown as { allowKeepInDefault?: boolean }).allowKeepInDefault ?? false,
+      thinkingKeeps: normalizeKeeps(
+        (m as unknown as { thinkingKeeps?: ThinkingKeep[] }).thinkingKeeps ??
+          (m as unknown as { thinkingKeep?: ThinkingKeep }).thinkingKeep != null
+          ? [(m as unknown as { thinkingKeep: ThinkingKeep }).thinkingKeep]
+          : []
+      )
     }
   }
   // 旧格式：thinkingType
@@ -101,11 +118,19 @@ function normalizeModel(m: ModelConfig): ModelConfig {
       (m as unknown as { thinkingLevels?: ThinkingLevel[] }).thinkingLevels
     ),
     allowEffortInDefault:
-      (m as unknown as { allowEffortInDefault?: boolean }).allowEffortInDefault ?? false
+      (m as unknown as { allowEffortInDefault?: boolean }).allowEffortInDefault ?? false,
+    allowKeepInDefault:
+      (m as unknown as { allowKeepInDefault?: boolean }).allowKeepInDefault ?? false,
+    thinkingKeeps: normalizeKeeps(
+      (m as unknown as { thinkingKeeps?: ThinkingKeep[] }).thinkingKeeps ??
+        (m as unknown as { thinkingKeep?: ThinkingKeep }).thinkingKeep != null
+        ? [(m as unknown as { thinkingKeep: ThinkingKeep }).thinkingKeep]
+        : []
+    )
   }
 }
 
-/** 兼容旧版本数据：把旧 thinkingEnabled 迁移为 thinkingMode，补全 visible */
+/** 兼容旧版本数据：把旧 thinkingEnabled 迁移为 thinkingMode，补全 visible、thinkingKeep */
 function normalizeConversation(c: Conversation): Conversation {
   let result = c
   if (typeof (result as unknown as { thinkingMode?: unknown }).thinkingMode !== 'string') {
@@ -114,6 +139,9 @@ function normalizeConversation(c: Conversation): Conversation {
   }
   if (typeof (result as unknown as { visible?: unknown }).visible !== 'boolean') {
     result = { ...result, visible: true }
+  }
+  if (typeof (result as unknown as { thinkingKeep?: unknown }).thinkingKeep !== 'string') {
+    result = { ...result, thinkingKeep: 'default' }
   }
   return result
 }
@@ -146,6 +174,11 @@ interface ChatboxState {
   settingsOpen: boolean
   settingsTab: 'models' | 'general'
 
+  // 应用内浏览器（webview）
+  browserUrl: string | null
+  openBrowser: (url: string) => void
+  closeBrowser: () => void
+
   // 流式状态
   isStreaming: boolean
   currentRequestId: string | null
@@ -170,6 +203,7 @@ interface ChatboxState {
   setThinkingMode: (mode: ThinkingMode) => void
   setThinkingLevel: (level: ThinkingLevel) => void
   setThinkingLevelFor: (convId: string, level: ThinkingLevel) => void
+  setThinkingKeep: (keep: ThinkingKeep) => void
 
   // 发送消息
   sendMessage: (text: string) => Promise<void>
@@ -302,6 +336,7 @@ export const useStore = create<ChatboxState>((set, get) => {
     currentConversationId: null,
     settingsOpen: false,
     settingsTab: 'general',
+    browserUrl: null,
     dialog: null,
 
     isStreaming: false,
@@ -335,7 +370,15 @@ export const useStore = create<ChatboxState>((set, get) => {
           if (thinkingMode === 'default' && !model.allowEffortInDefault) {
             thinkingLevel = 'default'
           }
-          return { ...c, thinkingMode, thinkingLevel }
+          let thinkingKeep = c.thinkingKeep
+          if (!model.thinkingKeeps.includes(thinkingKeep)) {
+            thinkingKeep = model.thinkingKeeps[0] ?? 'default'
+          }
+          // "默认"模式且不允许选择保留式思考时，强制不发送 thinking.keep
+          if (thinkingMode === 'default' && !model.allowKeepInDefault) {
+            thinkingKeep = 'default'
+          }
+          return { ...c, thinkingMode, thinkingLevel, thinkingKeep }
         })
       // 按更新时间倒序
       conversations.sort((a, b) => b.updatedAt - a.updatedAt)
@@ -349,7 +392,11 @@ export const useStore = create<ChatboxState>((set, get) => {
       const draftModel = models.find((m) => m.id === draftModelId)
       const draftThinking = draftModel
         ? thinkingStateForModel(draftModel)
-        : { thinkingMode: 'default' as ThinkingMode, thinkingLevel: null }
+        : {
+            thinkingMode: 'default' as ThinkingMode,
+            thinkingLevel: null,
+            thinkingKeep: 'default' as ThinkingKeep
+          }
       const draftNow = Date.now()
       const draft: Conversation = {
         id: uid(),
@@ -357,6 +404,7 @@ export const useStore = create<ChatboxState>((set, get) => {
         modelId: draftModelId,
         thinkingMode: draftThinking.thinkingMode,
         thinkingLevel: draftThinking.thinkingLevel,
+        thinkingKeep: draftThinking.thinkingKeep,
         messages: [],
         visible: false,
         createdAt: draftNow,
@@ -432,13 +480,18 @@ export const useStore = create<ChatboxState>((set, get) => {
       const model = state.models.find((m) => m.id === targetModelId)
       const thinking = model
         ? thinkingStateForModel(model)
-        : { thinkingMode: 'default' as ThinkingMode, thinkingLevel: null }
+        : {
+            thinkingMode: 'default' as ThinkingMode,
+            thinkingLevel: null,
+            thinkingKeep: 'default' as ThinkingKeep
+          }
       const conversation: Conversation = {
         id: uid(),
         title: '新对话',
         modelId: targetModelId,
         thinkingMode: thinking.thinkingMode,
         thinkingLevel: thinking.thinkingLevel,
+        thinkingKeep: thinking.thinkingKeep,
         messages: [],
         visible: false,
         createdAt: now,
@@ -513,7 +566,11 @@ export const useStore = create<ChatboxState>((set, get) => {
       const model = state.models.find((m) => m.id === modelId)
       const thinking = model
         ? thinkingStateForModel(model)
-        : { thinkingMode: 'default' as ThinkingMode, thinkingLevel: null }
+        : {
+            thinkingMode: 'default' as ThinkingMode,
+            thinkingLevel: null,
+            thinkingKeep: 'default' as ThinkingKeep
+          }
       set((s) => ({
         conversations: s.conversations.map((c) =>
           c.id === convId
@@ -521,7 +578,8 @@ export const useStore = create<ChatboxState>((set, get) => {
                 ...c,
                 modelId,
                 thinkingMode: thinking.thinkingMode,
-                thinkingLevel: thinking.thinkingLevel
+                thinkingLevel: thinking.thinkingLevel,
+                thinkingKeep: thinking.thinkingKeep
               }
             : c
         ),
@@ -543,6 +601,10 @@ export const useStore = create<ChatboxState>((set, get) => {
           // 切换到"默认"模式且不允许选择强度时，重置强度为 default（不发送 reasoning_effort）
           if (mode === 'default' && !model?.allowEffortInDefault) {
             return { ...c, thinkingMode: mode, thinkingLevel: 'default' }
+          }
+          // 切换到"默认"模式且不允许选择保留式思考时，重置保留式思考为 default
+          if (mode === 'default' && !model?.allowKeepInDefault) {
+            return { ...c, thinkingMode: mode, thinkingLevel: 'default', thinkingKeep: 'default' }
           }
           return { ...c, thinkingMode: mode }
         })
@@ -566,6 +628,18 @@ export const useStore = create<ChatboxState>((set, get) => {
       set((s) => ({
         conversations: s.conversations.map((c) =>
           c.id === convId ? { ...c, thinkingLevel: level } : c
+        )
+      }))
+      void persistConversation(convId)
+    },
+
+    setThinkingKeep(keep) {
+      const state = get()
+      const convId = state.currentConversationId
+      if (!convId) return
+      set((s) => ({
+        conversations: s.conversations.map((c) =>
+          c.id === convId ? { ...c, thinkingKeep: keep } : c
         )
       }))
       void persistConversation(convId)
@@ -688,7 +762,11 @@ export const useStore = create<ChatboxState>((set, get) => {
           frequencyPenalty: model.frequencyPenalty,
           maxTokens: model.maxTokens,
           thinkingMode,
-          thinkingLevel
+          thinkingLevel,
+          thinkingKeep:
+            thinkingMode === 'default' && !model.allowKeepInDefault
+              ? 'default'
+              : conv.thinkingKeep
         })
         set({ currentRequestId: requestId })
       } catch (err) {
@@ -737,6 +815,14 @@ export const useStore = create<ChatboxState>((set, get) => {
 
     async setTheme(theme) {
       await get().updateSettings({ theme })
+    },
+
+    openBrowser(url) {
+      set({ browserUrl: url })
+    },
+
+    closeBrowser() {
+      set({ browserUrl: null })
     },
 
     openDialog(opts) {

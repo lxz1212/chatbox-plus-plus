@@ -6,6 +6,7 @@ import { MessageBubble } from './components/MessageBubble'
 import { MessageInput } from './components/MessageInput'
 import { SettingsModal } from './components/SettingsModal'
 import { ConfirmDialog } from './components/ConfirmDialog'
+import { InAppBrowser } from './components/InAppBrowser'
 
 export default function App() {
   const initialized = useStore((s) => s.initialized)
@@ -81,6 +82,7 @@ export default function App() {
 
       {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
       <ConfirmDialog />
+      <InAppBrowser />
     </div>
   )
 }

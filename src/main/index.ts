@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell } from 'electron'
+import { app, BrowserWindow } from 'electron'
 import { join } from 'path'
 import { is, optimizer } from '@electron-toolkit/utils'
 import { registerIpcHandlers } from './ipc'
@@ -18,7 +18,8 @@ function createWindow(): void {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: true,
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      webviewTag: true
     }
   })
 
@@ -26,9 +27,8 @@ function createWindow(): void {
     mainWindow.show()
   })
 
-  // 外部链接在系统浏览器打开
-  mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url)
+  // 外部链接：由渲染层在应用内 webview 中打开
+  mainWindow.webContents.setWindowOpenHandler(() => {
     return { action: 'deny' }
   })
 

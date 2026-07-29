@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react'
 import {
   ALL_THINKING_LEVELS,
   ALL_THINKING_MODES,
+  ALL_THINKING_KEEPS,
   type ModelConfig,
   type ThinkingLevel,
-  type ThinkingMode
+  type ThinkingMode,
+  type ThinkingKeep
 } from '@shared/types'
 
 interface ModelFormProps {
@@ -28,6 +30,12 @@ const LEVEL_LABEL: Record<ThinkingLevel, string> = {
   max: '极致'
 }
 
+const THINKING_KEEP_LABEL: Record<ThinkingKeep, string> = {
+  default: '默认',
+  enabled: '开启',
+  disabled: '关闭'
+}
+
 const DEFAULT_FORM = {
   name: '',
   apiBase: 'https://api.openai.com/v1',
@@ -41,7 +49,9 @@ const DEFAULT_FORM = {
   maxTokens: '',
   thinkingModes: ['default'] as ThinkingMode[],
   thinkingLevels: ['default'] as ThinkingLevel[],
-  allowEffortInDefault: false
+  thinkingKeeps: ['default'] as ThinkingKeep[],
+  allowEffortInDefault: false,
+  allowKeepInDefault: false
 }
 
 export function ModelForm({ initial, onSave, onCancel }: ModelFormProps) {
@@ -49,10 +59,12 @@ export function ModelForm({ initial, onSave, onCancel }: ModelFormProps) {
   const [error, setError] = useState('')
   const [modeError, setModeError] = useState('')
   const [levelError, setLevelError] = useState('')
+  const [keepError, setKeepError] = useState('')
 
   useEffect(() => {
     setModeError('')
     setLevelError('')
+    setKeepError('')
     if (initial) {
       setForm({
         name: initial.name,
@@ -76,7 +88,11 @@ export function ModelForm({ initial, onSave, onCancel }: ModelFormProps) {
           ? [...initial.thinkingModes]
           : ['default'],
         thinkingLevels: [...initial.thinkingLevels],
-        allowEffortInDefault: initial.allowEffortInDefault ?? false
+        thinkingKeeps: Array.isArray(initial.thinkingKeeps)
+          ? [...initial.thinkingKeeps]
+          : ['default'],
+        allowEffortInDefault: initial.allowEffortInDefault ?? false,
+        allowKeepInDefault: initial.allowKeepInDefault ?? false
       })
     } else {
       setForm(DEFAULT_FORM)
@@ -108,6 +124,16 @@ export function ModelForm({ initial, onSave, onCancel }: ModelFormProps) {
     }))
   }
 
+  function toggleKeep(keep: ThinkingKeep): void {
+    setKeepError('')
+    setForm((f) => ({
+      ...f,
+      thinkingKeeps: f.thinkingKeeps.includes(keep)
+        ? f.thinkingKeeps.filter((k) => k !== keep)
+        : [...f.thinkingKeeps, keep]
+    }))
+  }
+
   function handleSubmit(): void {
     if (!form.name.trim()) return setError('请填写模型显示名称')
     if (!form.apiBase.trim()) return setError('请填写 API 基础地址')
@@ -116,13 +142,21 @@ export function ModelForm({ initial, onSave, onCancel }: ModelFormProps) {
 
     setModeError('')
     setLevelError('')
+    setKeepError('')
     if (form.thinkingModes.length === 0) {
       setModeError('请至少勾选一个思考模式')
     }
     if (form.thinkingLevels.length === 0) {
       setLevelError('请至少勾选一个思考强度等级')
     }
-    if (form.thinkingModes.length === 0 || form.thinkingLevels.length === 0) {
+    if (form.thinkingKeeps.length === 0) {
+      setKeepError('请至少勾选一个保留式思考选项')
+    }
+    if (
+      form.thinkingModes.length === 0 ||
+      form.thinkingLevels.length === 0 ||
+      form.thinkingKeeps.length === 0
+    ) {
       return
     }
 
@@ -145,7 +179,9 @@ export function ModelForm({ initial, onSave, onCancel }: ModelFormProps) {
       maxTokens: num(form.maxTokens),
       thinkingModes: [...form.thinkingModes],
       thinkingLevels: [...form.thinkingLevels],
-      allowEffortInDefault: form.allowEffortInDefault
+      thinkingKeeps: [...form.thinkingKeeps],
+      allowEffortInDefault: form.allowEffortInDefault,
+      allowKeepInDefault: form.allowKeepInDefault
     })
   }
 
@@ -314,6 +350,39 @@ export function ModelForm({ initial, onSave, onCancel }: ModelFormProps) {
                 <span>思考模式为「默认」时，允许在对话中选择思考强度</span>
               </label>
             )}
+            {form.thinkingModes.includes('default') && (
+              <label className="form-checkbox">
+                <input
+                  type="checkbox"
+                  checked={form.allowKeepInDefault}
+                  onChange={(e) => set('allowKeepInDefault', e.target.checked)}
+                />
+                <span>思考模式为「默认」时，允许在对话中选择保留式思考</span>
+              </label>
+            )}
+          </div>
+
+          <div className="form-section">
+            <h3 className="form-section-title">保留式思考</h3>
+            <p className="levels-hint">
+              勾选该模型支持的保留式思考选项（在对话时可从中选择）：
+            </p>
+            <div className="level-chips">
+              {ALL_THINKING_KEEPS.map((keep) => {
+                const on = form.thinkingKeeps.includes(keep)
+                return (
+                  <button
+                    key={keep}
+                    type="button"
+                    className={`chip ${on ? 'on' : ''}`}
+                    onClick={() => toggleKeep(keep)}
+                  >
+                    {THINKING_KEEP_LABEL[keep]}
+                  </button>
+                )
+              })}
+            </div>
+            {keepError && <p className="levels-error">{keepError}</p>}
           </div>
 
           <div className="form-section">

@@ -1,14 +1,36 @@
 import { useState, memo } from 'react'
-import ReactMarkdown from 'react-markdown'
+import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import remarkBreaks from 'remark-breaks'
 import rehypeKatex from 'rehype-katex'
+import rehypeHighlight from 'rehype-highlight'
 import type { ChatMessage } from '@shared/types'
 import { CopyIcon, CheckIcon, BrainIcon } from './Icons'
+import { useStore } from '../store'
 
 interface MessageBubbleProps {
   message: ChatMessage
+}
+
+// Markdown 链接渲染：点击时在应用内 webview 浏览器打开
+// （对话保留在背后，工具栏「返回对话」即可回来）
+const markdownComponents: Components = {
+  a({ href, children }) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={(e) => {
+          e.preventDefault()
+          if (href) useStore.getState().openBrowser(href)
+        }}
+      >
+        {children}
+      </a>
+    )
+  }
 }
 
 // 将 LaTeX 数学定界符转换为 remark-math 支持的 $ 定界符
@@ -56,7 +78,8 @@ function MessageBubbleBase({ message }: MessageBubbleProps) {
             <div className="reasoning-content">
               <ReactMarkdown
                 remarkPlugins={[remarkGfm, remarkMath]}
-                rehypePlugins={[rehypeKatex]}
+                rehypePlugins={[rehypeKatex, rehypeHighlight]}
+                components={markdownComponents}
               >
                 {preprocessMath(message.reasoning)}
               </ReactMarkdown>
@@ -69,7 +92,8 @@ function MessageBubbleBase({ message }: MessageBubbleProps) {
             <div className="plain-text">
               <ReactMarkdown
                 remarkPlugins={[remarkBreaks, remarkMath]}
-                rehypePlugins={[rehypeKatex]}
+                rehypePlugins={[rehypeKatex, rehypeHighlight]}
+                components={markdownComponents}
               >
                 {preprocessMath(message.content)}
               </ReactMarkdown>
@@ -77,7 +101,8 @@ function MessageBubbleBase({ message }: MessageBubbleProps) {
           ) : message.content ? (
             <ReactMarkdown
               remarkPlugins={[remarkGfm, remarkMath]}
-              rehypePlugins={[rehypeKatex]}
+              rehypePlugins={[rehypeKatex, rehypeHighlight]}
+              components={markdownComponents}
             >
               {preprocessMath(message.content)}
             </ReactMarkdown>
